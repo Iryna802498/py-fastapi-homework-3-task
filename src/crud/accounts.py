@@ -178,6 +178,7 @@ async def get_activation_token_by_user_email(
         .where(ActivationTokenModel.user == db_user)
     )
     await db.flush()
+    await db.commit()
     return {
         "message": "User account activated successfully."
     }
@@ -200,6 +201,7 @@ async def reset_password_token(
             db=db,
             user_id=result.id
         )
+        await db.commit()
     return {
         "message": "If you are registered, "
         "you will receive an email with instructions."
