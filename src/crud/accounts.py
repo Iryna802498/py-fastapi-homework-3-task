@@ -222,7 +222,7 @@ async def reset_password_complete(
                     detail="Invalid email or token."
                 )
             query = select(PasswordResetTokenModel).where(
-                    and_(
+                and_(
                         PasswordResetTokenModel.user == db_user,
                         PasswordResetTokenModel.token == user_request.token
                     )
