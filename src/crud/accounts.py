@@ -104,35 +104,35 @@ async def register_user_with_credentials(
     user_create: UserCreate
 ) -> UserRead:
     try:
-        async with db.begin():
-            user = await db.execute(
-                select(UserModel)
-                .where(UserModel.email == user_create.email)
+        user = await db.execute(
+            select(UserModel)
+            .where(UserModel.email == user_create.email)
+        )
+        existing = user.scalars().first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=(f"A user with this email "
+                        f"{user_create.email} already exists.")
             )
-            existing = user.scalars().first()
-            if existing:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(f"A user with this email "
-                            f"{user_create.email} already exists.")
-                )
-            hashed = hash_password(user_create.password)
-            db_user = UserModel(
-                email=user_create.email,
-                _hashed_password=hashed,
-                group_id=UserGroupEnum.USER.value
-            )
-            db.add(db_user)
-            await db.flush()
-            if db_user:
-                await add_activation_token(
-                    db=db,
-                    user_id=db_user.id
-                )
+        hashed = hash_password(user_create.password)
+        db_user = UserModel(
+            email=user_create.email,
+            _hashed_password=hashed,
+            group_id=UserGroupEnum.USER.value
+        )
+        db.add(db_user)
+        await db.flush()
+        await add_activation_token(
+            db=db,
+            user_id=db_user.id
+        )
+        await db.commit()
         return UserRead.model_validate(
             db_user
         )
     except SQLAlchemyError:
+        await db.rollback()
         raise HTTPException(
             status_code=500,
             detail="An error occurred during user creation."
@@ -316,6 +316,13 @@ async def new_access_token(
             status_code=400,
             detail="Token has expired."
         )
+    token_sub = token_valid.get("sub")
+    if not token_sub:
+        raise HTTPException(
+            status_code=400,
+            detail="Token has expired."
+        )
+    token_user_id = int(token_sub)
     db_refresh_token = select(RefreshTokenModel).where(
         RefreshTokenModel.token == user_request.refresh_token
     )
@@ -326,13 +333,6 @@ async def new_access_token(
             status_code=401,
             detail="Refresh token not found."
         )
-    token_sub = token_valid.get("sub")
-    if not token_sub:
-        raise HTTPException(
-            status_code=401,
-            etail="Refresh token not found."
-        )
-    token_user_id = int(token_sub)
     if token_user_id != result.user_id:
         raise HTTPException(
             status_code=401,

@@ -27,7 +27,7 @@ from crud.accounts import (
 router = APIRouter()
 
 
-@router.post("/register/", response_model=UserRead)
+@router.post("/register/", status_code=201)
 async def register_user(
     user_create: UserCreate,
     db: AsyncSession = Depends(get_db)
