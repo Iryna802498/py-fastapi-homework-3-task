@@ -57,6 +57,7 @@ async def add_activation_token(
     )
     db.add(token_model)
     await db.flush()
+    return token_model
 
 
 async def add_password_reset_token(
@@ -75,6 +76,7 @@ async def add_password_reset_token(
     )
     db.add(token_model)
     await db.flush()
+    return token_model
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int):
@@ -179,6 +181,7 @@ async def get_activation_token_by_user_email(
     )
     await db.flush()
     await db.commit()
+    await db.refresh(db_user)
     return {
         "message": "User account activated successfully."
     }
@@ -212,8 +215,8 @@ async def reset_password_complete(
     db: AsyncSession,
     user_request: UserResetPasswordComlete
 ) -> Dict[str, str]:
-    try:
-        async with db.begin():
+    async with db.begin():
+        try:
             db_user = await get_user_by_email(
                 db=db,
                 user_email=user_request.email
@@ -238,6 +241,7 @@ async def reset_password_complete(
                 )
             if is_token_expired(token.expires_at):
                 await db.delete(token)
+                await db.commit()
                 raise HTTPException(
                     status_code=400,
                     detail="Invalid email or token."
@@ -245,15 +249,14 @@ async def reset_password_complete(
             hashed = hash_password(user_request.password)
             db_user._hashed_password = hashed
             await db.delete(token)
-        return {
-            "message": "Password reset successfully."
-        }
-    except SQLAlchemyError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while resetting the password."
-        )
+        except SQLAlchemyError:
+            raise HTTPException(
+                status_code=500,
+                detail="An error occurred while resetting the password."
+            )
+    return {
+        "message": "Password reset successfully."
+    }
 
 
 async def login_user_with_credentials(
@@ -263,35 +266,35 @@ async def login_user_with_credentials(
     settings: BaseAppSettings
 ) -> TokenResponse:
     try:
-        db_user = await get_user_by_email(
-            db=db,
-            user_email=user_request.email
-        )
-        if not db_user or not verify_password(
-            plain_password=user_request.password,
-            hashed_password=db_user._hashed_password
-        ):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid email or password."
-            )
-        if db_user.is_active is False:
-            raise HTTPException(
-                status_code=403,
-                detail="User account is not activated."
-            )
-        create_access_token = jwt_manager.create_access_token(
-            data={"sub": str(db_user.id)}
-        )
-        create_refresh_token = jwt_manager.create_refresh_token(
-            data={"sub": str(db_user.id)}
-        )
-        refresh_token = RefreshTokenModel.create(
-            user_id=db_user.id,
-            days_valid=settings.LOGIN_TIME_DAYS,
-            token=create_refresh_token
-        )
         async with db.begin():
+            db_user = await get_user_by_email(
+                db=db,
+                user_email=user_request.email
+            )
+            if not db_user or not verify_password(
+                plain_password=user_request.password,
+                hashed_password=db_user._hashed_password
+            ):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid email or password."
+                )
+            if db_user.is_active is False:
+                raise HTTPException(
+                    status_code=403,
+                    detail="User account is not activated."
+                )
+            create_access_token = jwt_manager.create_access_token(
+                data={"sub": str(db_user.id)}
+            )
+            create_refresh_token = jwt_manager.create_refresh_token(
+                data={"sub": str(db_user.id)}
+            )
+            refresh_token = RefreshTokenModel.create(
+                user_id=db_user.id,
+                days_valid=settings.LOGIN_TIME_DAYS,
+                token=create_refresh_token
+            )
             db.add(refresh_token)
         return TokenResponse(
             access_token=create_access_token,
