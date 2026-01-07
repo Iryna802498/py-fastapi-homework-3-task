@@ -91,7 +91,7 @@ async def login(
     return response
 
 
-@router.post("/refresh/", response_model=AccessTokenResponse)
+@router.post("/api/v1/accounts/refresh/", response_model=AccessTokenResponse)
 async def access_token(
     user_request: RefreshTokenRequest,
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),

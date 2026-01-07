@@ -119,7 +119,7 @@ async def register_user_with_credentials(
             hashed = hash_password(user_create.password)
             db_user = UserModel(
                 email=user_create.email,
-                hashed_password=hashed,
+                _hashed_password=hashed,
                 group_id=UserGroupEnum.USER.value
             )
             db.add(db_user)
@@ -326,7 +326,13 @@ async def new_access_token(
             status_code=401,
             detail="Refresh token not found."
         )
-    token_user_id = int(token_valid.get("sub"))
+    token_sub = token_valid.get("sub")
+    if not token_sub:
+        raise HTTPException(
+            status_code=401,
+            etail="Refresh token not found."
+        )
+    token_user_id = int(token_sub)
     if token_user_id != result.user_id:
         raise HTTPException(
             status_code=401,
