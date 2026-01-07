@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import cast, Dict
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
 from sqlalchemy.exc import SQLAlchemyError
@@ -204,7 +205,6 @@ async def reset_password_token(
             db=db,
             user_id=result.id
         )
-        await db.commit()
     return {
         "message": "If you are registered, "
         "you will receive an email with instructions."
@@ -215,8 +215,8 @@ async def reset_password_complete(
     db: AsyncSession,
     user_request: UserResetPasswordComlete
 ) -> Dict[str, str]:
-    async with db.begin():
-        try:
+    try:
+        async with db.begin():
             db_user = await get_user_by_email(
                 db=db,
                 user_email=user_request.email
@@ -241,7 +241,6 @@ async def reset_password_complete(
                 )
             if is_token_expired(token.expires_at):
                 await db.delete(token)
-                await db.commit()
                 raise HTTPException(
                     status_code=400,
                     detail="Invalid email or token."
@@ -249,11 +248,11 @@ async def reset_password_complete(
             hashed = hash_password(user_request.password)
             db_user._hashed_password = hashed
             await db.delete(token)
-        except SQLAlchemyError:
-            raise HTTPException(
-                status_code=500,
-                detail="An error occurred while resetting the password."
-            )
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while resetting the password."
+        )
     return {
         "message": "Password reset successfully."
     }
@@ -296,10 +295,13 @@ async def login_user_with_credentials(
                 token=create_refresh_token
             )
             db.add(refresh_token)
-        return TokenResponse(
-            access_token=create_access_token,
-            refresh_token=create_refresh_token,
-            token_type="bearer"
+        return JSONResponse(
+            status_code=201,
+            content={
+                "access_token": create_access_token,
+                "refresh_token": create_refresh_token,
+                "token_type": "bearer"
+            }
         )
     except SQLAlchemyError:
         await db.rollback()
