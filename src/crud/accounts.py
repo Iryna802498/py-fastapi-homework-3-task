@@ -223,9 +223,9 @@ async def reset_password_complete(
                 )
             query = select(PasswordResetTokenModel).where(
                 and_(
-                        PasswordResetTokenModel.user == db_user,
-                        PasswordResetTokenModel.token == user_request.token
-                    )
+                    PasswordResetTokenModel.user == db_user,
+                    PasswordResetTokenModel.token == user_request.token
+                )
             )
             result = await db.execute(query)
             token = result.scalars().first()
