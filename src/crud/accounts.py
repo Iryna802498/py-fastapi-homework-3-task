@@ -249,6 +249,7 @@ async def reset_password_complete(
             "message": "Password reset successfully."
         }
     except SQLAlchemyError:
+        await db.rollback()
         raise HTTPException(
             status_code=500,
             detail="An error occurred while resetting the password."
@@ -298,6 +299,7 @@ async def login_user_with_credentials(
             token_type="bearer"
         )
     except SQLAlchemyError:
+        await db.rollback()
         raise HTTPException(
             status_code=500,
             detail="An error occurred while processing the request."
