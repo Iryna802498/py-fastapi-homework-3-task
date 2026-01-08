@@ -126,7 +126,7 @@ async def register_user_with_credentials(
         hashed = hash_password(user_create.password)
         db_user = UserModel(
             email=user_create.email,
-            hashed_password=hashed,
+            _hashed_password=hashed,
             group_id=group.id
         )
         db.add(db_user)
@@ -257,7 +257,7 @@ async def reset_password_complete(
                     detail="Invalid email or token."
                 )
             hashed = hash_password(user_request.password)
-            db_user.hashed_password = hashed
+            db_user._hashed_password = hashed
             await db.delete(token)
     except SQLAlchemyError:
         raise HTTPException(
@@ -282,7 +282,7 @@ async def login_user_with_credentials(
         )
         if not db_user or not verify_password(
             plain_password=user_request.password,
-            hashed_password=db_user.hashed_password
+            hashed_password=db_user._hashed_password
         ):
             raise HTTPException(
                 status_code=401,
