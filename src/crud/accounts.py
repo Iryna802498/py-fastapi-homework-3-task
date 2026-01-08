@@ -8,6 +8,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from security.passwords import hash_password, verify_password
 from security.interfaces import JWTAuthManagerInterface
 from config.settings import BaseAppSettings
+from exceptions.security import (
+    BaseSecurityError,
+    TokenExpiredError,
+    InvalidTokenError
+)
 from database.models.accounts import (
     UserModel,
     UserGroupEnum,
@@ -134,7 +139,7 @@ async def register_user_with_credentials(
         return UserRead.model_validate(
             db_user
         )
-    except SQLAlchemyError:
+    except BaseSecurityError:
         await db.rollback()
         raise HTTPException(
             status_code=500,
@@ -248,7 +253,7 @@ async def reset_password_complete(
             hashed = hash_password(user_request.password)
             db_user._hashed_password = hashed
             await db.delete(token)
-    except SQLAlchemyError:
+    except BaseSecurityError:
         raise HTTPException(
             status_code=500,
             detail="An error occurred while resetting the password."
@@ -320,14 +325,14 @@ async def new_access_token(
         token_valid = jwt_manager.decode_refresh_token(
             token=user_request.refresh_token
         )
-    except Exception:
-        raise HTTPException(
+    except BaseSecurityError:
+        raise TokenExpiredError(
             status_code=400,
             detail="Token has expired."
         )
     token_sub = token_valid.get("sub")
     if not token_sub:
-        raise HTTPException(
+        raise TokenExpiredError(
             status_code=400,
             detail="Token has expired."
         )
