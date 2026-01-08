@@ -275,7 +275,8 @@ async def login_user_with_credentials(
         user_email=user_request.email
     )
     if not db_user or not verify_password(
-        user_request.password
+        user_request.password,
+        db_user._hashed_password
     ):
         raise HTTPException(
             status_code=401,
@@ -343,11 +344,6 @@ async def new_access_token(
         .where(UserModel.id == int(user_id))
     )
     user = db_user.scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found."
-        )
     if not user:
         raise HTTPException(
             status_code=404,
