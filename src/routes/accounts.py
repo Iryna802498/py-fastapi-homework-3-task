@@ -5,14 +5,11 @@ from config import get_jwt_auth_manager, BaseAppSettings, get_settings
 from database import get_db
 from schemas.accounts import (
     UserCreate,
-    UserRead,
     UserActivateToken,
     UserPasswordReset,
     UserResetPasswordComlete,
     UserLoginRequest,
-    TokenResponse,
-    RefreshTokenRequest,
-    AccessTokenResponse
+    RefreshTokenRequest
 )
 from security.interfaces import JWTAuthManagerInterface
 from crud.accounts import (
@@ -91,7 +88,7 @@ async def login(
     return response
 
 
-@router.post("/api/v1/accounts/refresh/", response_model=AccessTokenResponse)
+@router.post("/api/v1/accounts/refresh/", status_code=200)
 async def access_token(
     user_request: RefreshTokenRequest,
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),

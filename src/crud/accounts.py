@@ -8,11 +8,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from security.passwords import hash_password, verify_password
 from security.interfaces import JWTAuthManagerInterface
 from config.settings import BaseAppSettings
-from exceptions.security import (
-    BaseSecurityError,
-    TokenExpiredError,
-    InvalidTokenError
-)
 from database.models.accounts import (
     UserModel,
     UserGroupEnum,
@@ -82,6 +77,7 @@ async def add_password_reset_token(
     )
     db.add(token_model)
     await db.flush()
+    await db.commit()
     return token_model
 
 
@@ -139,7 +135,7 @@ async def register_user_with_credentials(
         return UserRead.model_validate(
             db_user
         )
-    except BaseSecurityError:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(
             status_code=500,
@@ -253,7 +249,7 @@ async def reset_password_complete(
             hashed = hash_password(user_request.password)
             db_user._hashed_password = hashed
             await db.delete(token)
-    except BaseSecurityError:
+    except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
             detail="An error occurred while resetting the password."
@@ -299,7 +295,9 @@ async def login_user_with_credentials(
                 days_valid=settings.LOGIN_TIME_DAYS,
                 token=create_refresh_token
             )
+            db.add(create_access_token)
             db.add(refresh_token)
+            await db.commit()
         return JSONResponse(
             status_code=201,
             content={
@@ -325,14 +323,14 @@ async def new_access_token(
         token_valid = jwt_manager.decode_refresh_token(
             token=user_request.refresh_token
         )
-    except BaseSecurityError:
-        raise TokenExpiredError(
+    except Exception:
+        raise HTTPException(
             status_code=400,
             detail="Token has expired."
         )
     token_sub = token_valid.get("sub")
     if not token_sub:
-        raise TokenExpiredError(
+        raise HTTPException(
             status_code=400,
             detail="Token has expired."
         )
