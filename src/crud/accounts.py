@@ -79,6 +79,7 @@ async def add_password_reset_token(
     async with db.begin():
         db.add(token_model)
         await db.flush()
+        await db.commit()
     return token_model
 
 
@@ -226,39 +227,39 @@ async def reset_password_complete(
     user_request: UserResetPasswordComlete
 ) -> Dict[str, str]:
     try:
-        async with db.begin():
-            db_user = await get_user_by_email(
-                db=db,
-                user_email=user_request.email
+        db_user = await get_user_by_email(
+            db=db,
+            user_email=user_request.email
+        )
+        if not db_user or db_user.is_active is False:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid email or token."
             )
-            if not db_user or db_user.is_active is False:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid email or token."
-                )
-            query = select(PasswordResetTokenModel).where(
-                and_(
-                    PasswordResetTokenModel.user == db_user,
-                    PasswordResetTokenModel.token == user_request.token
-                )
+        query = select(PasswordResetTokenModel).where(
+            and_(
+                PasswordResetTokenModel.user == db_user,
+                PasswordResetTokenModel.token == user_request.token
             )
-            result = await db.execute(query)
-            token = result.scalars().first()
-            if not token:
-                await db.delete(token)
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid email or token."
-                )
-            if is_token_expired(token.expires_at):
-                await db.delete(token)
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid email or token."
-                )
-            hashed = hash_password(user_request.password)
-            db_user._hashed_password = hashed
+        )
+        result = await db.execute(query)
+        token = result.scalars().first()
+        if not token:
             await db.delete(token)
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid email or token."
+            )
+        if is_token_expired(token.expires_at):
+            await db.delete(token)
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid email or token."
+            )
+        hashed = hash_password(user_request.password)
+        db_user._hashed_password = hashed
+        await db.delete(token)
+        await db.commit()
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
