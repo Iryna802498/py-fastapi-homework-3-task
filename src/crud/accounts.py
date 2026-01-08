@@ -10,7 +10,7 @@ from security.interfaces import JWTAuthManagerInterface
 from config.settings import BaseAppSettings
 from database.models.accounts import (
     UserModel,
-    UserGroupEnum,
+    UserGroupModel,
     ActivationTokenModel,
     PasswordResetTokenModel,
     RefreshTokenModel
@@ -122,8 +122,8 @@ async def register_user_with_credentials(
         hashed = hash_password(user_create.password)
         db_user = UserModel(
             email=user_create.email,
-            _hashed_password=hashed,
-            group_id=UserGroupEnum.USER.value
+            hashed_password=hashed,
+            group_id=UserGroupModel.id
         )
         db.add(db_user)
         await db.flush()
@@ -151,6 +151,11 @@ async def get_activation_token_by_user_email(
         db=db,
         user_email=user_request.email
     )
+    if not db_user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found."
+        )
     query = select(ActivationTokenModel).where(
         ActivationTokenModel.user == db_user
     )
@@ -249,6 +254,7 @@ async def reset_password_complete(
             hashed = hash_password(user_request.password)
             db_user._hashed_password = hashed
             await db.delete(token)
+            await db.commit()
     except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
@@ -273,7 +279,7 @@ async def login_user_with_credentials(
             )
             if not db_user or not verify_password(
                 plain_password=user_request.password,
-                hashed_password=db_user._hashed_password
+                hashed_password=db_user.hashed_password
             ):
                 raise HTTPException(
                     status_code=401,
@@ -295,17 +301,12 @@ async def login_user_with_credentials(
                 days_valid=settings.LOGIN_TIME_DAYS,
                 token=create_refresh_token
             )
-            db.add(create_access_token)
             db.add(refresh_token)
-            await db.commit()
-        return JSONResponse(
-            status_code=201,
-            content={
-                "access_token": create_access_token,
-                "refresh_token": create_refresh_token,
-                "token_type": "bearer"
-            }
-        )
+        return {
+            "access_token": create_access_token,
+            "refresh_token": create_refresh_token,
+            "token_type": "bearer"
+        }
     except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(
