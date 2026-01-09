@@ -156,7 +156,7 @@ async def get_activation_token_by_user_email(
     )
     if not db_user:
         raise HTTPException(
-            status_code=404,
+            status_code=400,
             detail="Invalid or expired activation token."
         )
     if db_user.is_active:
