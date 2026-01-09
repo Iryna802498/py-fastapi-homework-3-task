@@ -57,7 +57,7 @@ async def add_activation_token(
         expires_at=expires_at
     )
     db.add(token_model)
-    await db.commit()
+    await db.flush()
     return token_model
 
 
@@ -76,7 +76,7 @@ async def add_password_reset_token(
         expires_at=expires_at
     )
     db.add(token_model)
-    await db.commit()
+    await db.flush()
     return token_model
 
 
@@ -133,6 +133,7 @@ async def register_user_with_credentials(
             db=db,
             user_id=db_user.id
         )
+        await db.commit()
         await db.refresh(db_user)
         return UserRead.model_validate(
             db_user
@@ -156,7 +157,7 @@ async def get_activation_token_by_user_email(
     if not db_user:
         raise HTTPException(
             status_code=404,
-            detail="User not found."
+            detail="Invalid or expired activation token."
         )
     if db_user.is_active:
         raise HTTPException(
@@ -202,6 +203,7 @@ async def reset_password_token(
             db=db,
             user_id=db_user.id
         )
+        await db.commit()
     return {
         "message": "If you are registered, "
         "you will receive an email with instructions."

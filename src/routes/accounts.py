@@ -9,7 +9,8 @@ from schemas.accounts import (
     UserPasswordReset,
     UserResetPasswordComlete,
     UserLoginRequest,
-    RefreshTokenRequest
+    RefreshTokenRequest,
+    AccessTokenResponse
 )
 from security.interfaces import JWTAuthManagerInterface
 from crud.accounts import (
@@ -88,7 +89,7 @@ async def login(
     return response
 
 
-@router.post("/refresh/", status_code=200)
+@router.post("/refresh/", response_model=AccessTokenResponse)
 async def access_token(
     user_request: RefreshTokenRequest,
     jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
