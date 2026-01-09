@@ -75,9 +75,8 @@ async def add_password_reset_token(
         token=token,
         expires_at=expires_at
     )
-    async with db.begin():
-        db.add(token_model)
-        await db.commit()
+    db.add(token_model)
+    await db.commit()
     return token_model
 
 
