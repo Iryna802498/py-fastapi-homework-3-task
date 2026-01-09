@@ -73,7 +73,7 @@ async def complete_reset_password(
     return response
 
 
-@router.post("/login/", status_code=200)
+@router.post("/login/", status_code=201)
 async def login(
     user_request: UserLoginRequest,
     db: AsyncSession = Depends(get_db),
